@@ -1,0 +1,14 @@
+{
+  "alarms": {
+    "v": 28.0,
+    "i": 8.0,
+    "p": 224.0,
+    "t": 80.0
+  },
+  "temperature_unit": "C",
+  "window": 30,
+  "smooth": 0.0,
+  "stop_cmd": false,
+  "privacy": false,
+  "port": 8765
+}

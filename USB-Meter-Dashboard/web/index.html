@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#070a0f">
+<title>USB Meter Dashboard · USB 功率计</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b1220'/%3E%3Cpath d='M18 5 9 18h6l-1 9 9-13h-6z' fill='%2338bdf8'/%3E%3C/svg%3E">
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="bg-glow"></div>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 5 13.2h5.2L9.4 22l8.6-11.4h-5.1z"/></svg>
+      </div>
+      <div class="brand-text">
+        <h1>USB Meter <span>Dashboard</span></h1>
+        <p>USB 功率计 · 实时仪表盘</p>
+      </div>
+    </div>
+
+    <div class="conn" id="conn" data-state="offline">
+      <span class="conn-dot"></span>
+      <div class="conn-text">
+        <strong id="devName">正在扫描…</strong>
+        <small id="devSub">USB 功率计 · 未连接</small>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn ghost" id="btnPause" title="暂停/继续界面刷新 (空格)">
+        <svg viewBox="0 0 24 24"><path d="M8 5h3v14H8zM13 5h3v14h-3z"/></svg><span>暂停</span>
+      </button>
+      <button class="btn ghost" id="btnNew" title="开始新的记录会话 (N)">
+        <svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg><span>新会话</span>
+      </button>
+      <button class="btn ghost" id="btnExport" title="导出本次记录 CSV (E)">
+        <svg viewBox="0 0 24 24"><path d="M12 3v10.2l3.6-3.6 1.4 1.4-6 6-6-6 1.4-1.4L10 13.2V3zM5 19h14v2H5z"/></svg><span>导出 CSV</span>
+      </button>
+      <a class="btn ghost accent" href="/debug" title="诊断页面：设备、原始数据、日志">
+        <svg viewBox="0 0 24 24"><path d="M12 2 3 7v10l9 5 9-5V7zm0 2.3 7 3.9v7.6l-7 3.9-7-3.9V8.2zM11 7h2v7h-2zm0 8h2v2h-2z"/></svg><span>诊断</span>
+      </a>
+      <button class="btn icon" id="btnSettings" title="设置">
+        <svg viewBox="0 0 24 24"><path d="M12 8.5A3.5 3.5 0 1 0 12 15.5 3.5 3.5 0 0 0 12 8.5zm9 3.5-.1-1.2 1.7-1.3-1.7-3-2 .8-1.1-.6-.3-2.1h-3.4l-.3 2.1-1.1.6-2-.8-1.7 3L8.9 10.8 8.8 12l.1 1.2-1.7 1.3 1.7 3 2-.8 1.1.6.3 2.1h3.4l.3-2.1 1.1-.6 2 .8 1.7-3-1.7-1.3z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="kpis" id="kpis">
+      <article class="kpi" data-series="v" id="kpi-v">
+        <div class="kpi-head"><i></i><span>电压</span><em>VBUS</em></div>
+        <div class="kpi-value"><b id="val-v">0.0000</b><u>V</u></div>
+        <div class="kpi-foot"><span>最低 <b id="min-v">–</b></span><span>最高 <b id="max-v">–</b></span></div>
+        <canvas class="spark" id="spark-v"></canvas>
+      </article>
+      <article class="kpi" data-series="i" id="kpi-i">
+        <div class="kpi-head"><i></i><span>电流</span><em>IBUS</em></div>
+        <div class="kpi-value"><b id="val-i">0.0000</b><u>A</u></div>
+        <div class="kpi-foot"><span>最低 <b id="min-i">–</b></span><span>最高 <b id="max-i">–</b></span></div>
+        <canvas class="spark" id="spark-i"></canvas>
+      </article>
+      <article class="kpi" data-series="p" id="kpi-p">
+        <div class="kpi-head"><i></i><span>功率</span><em>PBUS</em></div>
+        <div class="kpi-value"><b id="val-p">0.000</b><u>W</u></div>
+        <div class="kpi-foot"><span>峰值 <b id="peak-p">–</b></span><span>平均 <b id="avg-p">–</b></span></div>
+        <canvas class="spark" id="spark-p"></canvas>
+      </article>
+      <article class="kpi" data-series="t" id="kpi-t">
+        <div class="kpi-head"><i></i><span>温度</span><em>TEMP</em></div>
+        <div class="kpi-value"><b id="val-t">0.0</b><u>°C</u></div>
+        <div class="kpi-foot"><span>负载 R <b id="val-r">–</b></span><span>状态 <b id="val-heat">–</b></span></div>
+        <canvas class="spark" id="spark-t"></canvas>
+      </article>
+    </section>
+
+    <section class="panel chart-panel">
+      <div class="panel-head">
+        <div class="tabs" id="chartTabs">
+          <button data-series="v" class="on">电压</button>
+          <button data-series="i">电流</button>
+          <button data-series="p">功率</button>
+          <button data-series="r">纹波</button>
+        </div>
+        <div class="chart-tools">
+          <div class="seg" id="windowSeg">
+            <button data-win="10">10s</button>
+            <button data-win="30" class="on">30s</button>
+            <button data-win="60">1m</button>
+            <button data-win="300">5m</button>
+            <button data-win="600">10m</button>
+            <button data-win="1800">30m</button>
+          </div>
+          <button class="btn icon tiny" id="btnChartPause" title="冻结曲线">
+            <svg viewBox="0 0 24 24"><path d="M8 5h3v14H8zM13 5h3v14h-3z"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="chart-wrap" id="chartWrap">
+        <canvas id="chart"></canvas>
+        <div class="crosshair" id="crosshair" hidden>
+          <span class="ch-time" id="chTime"></span>
+          <span class="ch-val" id="chVal"></span>
+        </div>
+        <div class="chart-badge" id="chartBadge" hidden>已冻结</div>
+      </div>
+      <div class="chart-foot">
+        <span id="chartHint">把鼠标移到曲线上查看读数</span>
+        <span id="chartRange">–</span>
+      </div>
+
+      <div class="empty-state" id="emptyState">
+        <div class="empty-art">
+          <svg viewBox="0 0 220 130" aria-hidden="true">
+            <rect x="30" y="18" width="160" height="94" rx="12" fill="url(#g1)" stroke="rgba(255,255,255,.14)"/>
+            <rect x="48" y="34" width="124" height="44" rx="6" fill="#05080d" stroke="rgba(56,189,248,.35)"/>
+            <text x="60" y="55" fill="#38bdf8" font-family="Bahnschrift,Consolas" font-size="15">12.00 V</text>
+            <text x="60" y="70" fill="#fb923c" font-family="Bahnschrift,Consolas" font-size="12">2.350 A</text>
+            <rect x="48" y="88" width="54" height="12" rx="6" fill="rgba(255,255,255,.08)"/>
+            <rect x="110" y="88" width="62" height="12" rx="6" fill="rgba(255,255,255,.08)"/>
+            <path d="M96 96h22" stroke="rgba(255,255,255,.2)" stroke-width="3" stroke-linecap="round"/>
+            <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#182433"/><stop offset="1" stop-color="#0c121b"/>
+            </linearGradient></defs>
+          </svg>
+        </div>
+        <h2 id="emptyTitle">未检测到 <span>USB 功率计</span></h2>
+        <p>用 USB-C 数据线把仪表接到电脑，页面会自动连接。首次使用请确认线缆是<strong>数据线</strong>而非纯充电线。</p>
+        <div class="empty-actions">
+          <button class="btn primary" id="btnRetry">重新扫描</button>
+          <a class="btn ghost" href="/debug">打开诊断页面</a>
+        </div>
+        <p class="empty-note" id="emptyNote"></p>
+      </div>
+    </section>
+
+    <aside class="side">
+      <section class="panel">
+        <div class="panel-title"><h3>信号与采样</h3><span class="pill" id="ratePill">0 sps</span></div>
+        <dl class="rows">
+          <div><dt>D+ 电平</dt><dd id="dp">–</dd></div>
+          <div><dt>D- 电平</dt><dd id="dn">–</dd></div>
+          <div><dt>负载电阻</dt><dd id="res">–</dd></div>
+          <div><dt>纹波 Vpp</dt><dd id="rippleVpp" title="最近 2 秒、≤50 Hz、10 µV 分辨率；不含高频开关纹波">–</dd></div>
+          <div><dt>纹波 Vrms</dt><dd id="rippleVrms" title="最近 2 秒、≤50 Hz、10 µV 分辨率；不含高频开关纹波">–</dd></div>
+          <div><dt>温度</dt><dd id="temp">–</dd></div>
+          <div><dt>数据包</dt><dd id="packets">0</dd></div>
+          <div><dt>CRC 异常</dt><dd id="crc">0</dd></div>
+        </dl>
+        <p class="panel-note">USB 链路只有 100 sps：这里的纹波是最近 2 秒、≤50 Hz 的低频交流分量（Vrms 为标准差），不含开关电源的高频纹波。要看真实纹波请用仪表自带的高速纹波模式。</p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title"><h3>本次会话</h3><span class="rec off" id="recState" title="点击开始 / 停止写入 CSV"><i></i>未记录（点击开始）</span></div>
+        <div class="session-grid">
+          <div class="cell"><span>容量</span><b id="cap">0.0000</b><u>Ah</u></div>
+          <div class="cell"><span>能量</span><b id="nrg">0.0000</b><u>Wh</u></div>
+          <div class="cell"><span>峰值功率</span><b id="peakw">0.00</b><u>W</u></div>
+          <div class="cell"><span>时长</span><b id="duration">00:00</b><u></u></div>
+        </div>
+        <p class="file" id="csvName">–</p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title"><h3>极值 / 均值</h3><span class="pill">本会话</span></div>
+        <table class="stats">
+          <thead><tr><th></th><th>最低</th><th>平均</th><th>最高</th></tr></thead>
+          <tbody>
+            <tr><th>电压 V</th><td id="sv-min">–</td><td id="sv-avg">–</td><td id="sv-max">–</td></tr>
+            <tr><th>电流 A</th><td id="si-min">–</td><td id="si-avg">–</td><td id="si-max">–</td></tr>
+            <tr><th>功率 W</th><td>–</td><td id="sp-avg">–</td><td id="sp-max">–</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="foot">
+    <span>USB Meter Dashboard <b id="ver">v1.0</b> · 本地运行，数据不出电脑</span>
+    <span class="foot-right"><i id="alarmDot"></i><span id="alarmText">报警未触发</span></span>
+  </footer>
+</div>
+
+<div class="modal" id="settingsModal" hidden>
+  <div class="modal-card">
+    <header><h2>设置</h2><button class="btn icon" id="btnCloseSettings">✕</button></header>
+    <div class="fields">
+      <label>过压报警 (V)<input type="number" id="set-v" step="0.1" min="0" max="60"></label>
+      <label>过流报警 (A)<input type="number" id="set-i" step="0.1" min="0" max="20"></label>
+      <label>过功率报警 (W)<input type="number" id="set-p" step="0.1" min="0" max="500"></label>
+      <label>过温报警 (°C)<input type="number" id="set-t" step="1" min="0" max="150"></label>
+      <label>仪表平滑
+        <select id="set-smooth">
+          <option value="0">关闭（原始值）</option>
+          <option value="0.3">弱（0.3 秒）</option>
+          <option value="1">中（1 秒）</option>
+          <option value="3">强（3 秒）</option>
+          <option value="5">更强（5 秒）</option>
+          <option value="10">极强（10 秒）</option>
+        </select>
+      </label>
+      <label>服务端口
+        <input type="number" id="set-port" min="1024" max="65535" step="1" placeholder="8765">
+      </label>
+      <label class="switch"><input type="checkbox" id="set-sound" checked><span>报警时发出提示音</span></label>
+      <label class="switch"><input type="checkbox" id="set-privacy"><span>隐私模式：SN / VID:PID / 路径打码，并隐藏其他 HID 设备</span></label>
+    </div>
+    <p class="modal-hint">修改「服务端口」后，页面会自动跳转到新地址，旧地址随即失效。隐私模式只影响显示和导出，不影响连接。</p>
+    <footer>
+      <button class="btn ghost" id="btnCancelSettings">取消</button>
+      <button class="btn primary" id="btnSaveSettings">保存</button>
+    </footer>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
